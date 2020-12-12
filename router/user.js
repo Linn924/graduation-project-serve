@@ -261,4 +261,28 @@ user.put('/agreeComment', async ctx =>{
     
 })
 
+//查询所有当前用户评论过的博客信息
+user.get('/allCommentBlog/:id',async ctx => {
+    const id = ctx.params.id
+    
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `SELECT b.id,b.title,b.introduce,b.date,b.mdname
+                 FROM blog_comment a,blog b where a.user_id = ${id} and a.blog_id = b.id`
+    const [data] = await connection.query(sql)
+    connection.end(function (err) { }) //连接结束
+
+    if (data.length >= 0) {
+        ctx.body = {
+            data,
+            code:200,
+            tips:'获取数据成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取数据失败'
+        }
+    }
+})
+
 module.exports = user

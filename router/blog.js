@@ -414,7 +414,7 @@ blog.post('/addComment',async ctx => {
     const connection = await Mysql.createConnection(mysql)
     const sql = `INSERT INTO blog_comment (blog_id,user_id,content,date,agree_count,agree_user_id) VALUE
           (${commentForm.blog_id}, ${commentForm.user_id},'${commentForm.content.trim()}', 
-          '${commentForm.date.trim()}', ${commentForm.agree_count},, '[]')`
+          '${commentForm.date.trim()}', ${commentForm.agree_count}, '[]')`
     const [rs] = await connection.query(sql)
     connection.end(function (err) { }) //连接结束
 
