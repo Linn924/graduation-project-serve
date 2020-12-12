@@ -312,7 +312,33 @@ blog.get('/getAboutSortData',async ctx => {
     var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
                  a.content,a.sortId,a.technologyId,b.sort_name,
                  c.technology_name FROM blog a,blog_sort b,blog_technology c 
-                 WHERE a.sortId = '${id}' and a.sortId = b.id and a.technologyId = c.id`
+                 WHERE a.sortId = ${id} and a.sortId = b.id and a.technologyId = c.id`
+    var [data] = await connection.query(sql)
+    connection.end(function (err) { }) //连接结束
+
+    if (data.length >= 0) {
+        ctx.body = {
+            data,
+            code:200,
+            tips:'获取数据成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取数据失败'
+        }
+    }
+})
+
+//获取所有与指定标签有关的博客数据
+blog.get('/getAboutLabelData',async ctx => {
+    const id = ctx.request.query.id
+
+    const connection = await Mysql.createConnection(mysql)
+    var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
+                 a.content,a.sortId,a.technologyId,b.sort_name,
+                 c.technology_name FROM blog a,blog_sort b,blog_technology c 
+                 WHERE a.technologyId = ${id} and a.sortId = b.id and a.technologyId = c.id`
     var [data] = await connection.query(sql)
     connection.end(function (err) { }) //连接结束
 
