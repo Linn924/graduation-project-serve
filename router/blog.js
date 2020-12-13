@@ -408,7 +408,7 @@ blog.get('/getAllComment/:id',async ctx => {
     const blog_id = ctx.params.id 
 
     const connection = await Mysql.createConnection(mysql)
-    const sql = `SELECT a.id,a.content,a.date,a.agree_count,a.user_id,a.agree_user_id,b.username,b.avatar 
+    const sql = `SELECT a.id,a.content,a.date,a.agree_count,a.user_id,a.agree_user_id,b.username,b.avatar,b.praised 
                  FROM blog_comment a,user b where a.blog_id = ${blog_id} and a.user_id = b.id`
     const [data] = await connection.query(sql)
 
@@ -477,6 +477,34 @@ blog.post('/replyComment',async ctx => {
         ctx.body = {
             code:400,
             tips:'评论失败'
+        }
+    }
+})
+
+//评论排行榜
+blog.get('/commentLeaderboard',async ctx => {
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `SELECT a.content,a.agree_count,a.date,b.username FROM blog_comment a,user b WHERE a.user_id = b.id
+                 ORDER BY agree_count DESC LIMIT 0,10`
+    const [data] = await connection.query(sql)
+
+    const sql2 = `SELECT username,praised FROM user`
+    const [data2] = await connection.query(sql2)
+    connection.end(function (err) { }) //连接结束
+
+    let res = data.filter(item => item.agree_count !== 0)
+
+    if (data.length >= 0 && data2.length > 0) {
+        ctx.body = {
+            data:res,
+            data2,
+            code:200,
+            tips:'获取评论排行榜数据成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取评论排行榜数据失败'
         }
     }
 })

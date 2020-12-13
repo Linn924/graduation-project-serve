@@ -100,8 +100,8 @@ user.post('/register',async ctx => {
     const avatar = ctx.request.body.avatar.trim()
 
     const connection = await Mysql.createConnection(mysql)
-    const sql = `INSERT INTO user (username,password,email,avatar)
-                    VALUE('${username}', '${password}', '${email}', '${avatar}')`
+    const sql = `INSERT INTO user (username,password,email,avatar,praised_count)
+                    VALUE('${username}', '${password}', '${email}', '${avatar}',0)`
     const [res] = await connection.query(sql)
     connection.end((err) => console.log(err))
 
@@ -241,13 +241,19 @@ user.put('/agreeComment', async ctx =>{
     const id = ctx.request.body.id
     const agree_count = ctx.request.body.agree_count
     const agree_user_id = ctx.request.body.agree_user_id
+    const praised = ctx.request.body.praised
+    const linked_id = ctx.request.body.linked_id
+
 
     const connection = await Mysql.createConnection(mysql)
     const sql = `UPDATE blog_comment SET agree_count=${agree_count},agree_user_id='${agree_user_id}' WHERE id=${id}`
     const [res] = await connection.query(sql)
+
+    const sql2 = `UPDATE user SET praised=${praised} WHERE id=${linked_id}`
+    const [res2] = await connection.query(sql2)
     connection.end((err) => console.log(err))
 
-    if (res.affectedRows > 0) {
+    if (res.affectedRows > 0 && res2.affectedRows > 0) {
         ctx.body = {
             code:200,
             tips:'修改成功',
