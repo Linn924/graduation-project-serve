@@ -13,14 +13,14 @@ blog.get('/blogdata', async ctx => {
     const connection = await Mysql.createConnection(mysql)
     if (key == '' || key == null) {
         var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
-                 a.content,a.sortId,a.technologyId,b.sort_name,
+                 a.content,a.sortId,a.technologyId,a.pageviews,b.sort_name,
                  c.technology_name FROM blog a,blog_sort b,blog_technology c 
                  WHERE a.sortId = b.id and a.technologyId = c.id
                  LIMIT ${pagenum * pagesize},${pagesize}`
         var [data] = await connection.query(sql)
     } else {
         var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
-                 a.content,a.sortId,a.technologyId,b.sort_name,
+                 a.content,a.sortId,a.technologyId,a.pageviews,b.sort_name,
                  c.technology_name FROM blog a,blog_sort b,blog_technology c 
                  WHERE a.sortId = b.id and a.technologyId = c.id and a.title like '%${key}%'
                  LIMIT ${pagenum * pagesize},${pagesize}`
@@ -335,7 +335,7 @@ blog.get('/getAboutLabelData',async ctx => {
     const id = ctx.request.query.id
 
     const connection = await Mysql.createConnection(mysql)
-    var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
+    var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,a.pageviews,
                  a.content,a.sortId,a.technologyId,b.sort_name,
                  c.technology_name FROM blog a,blog_sort b,blog_technology c 
                  WHERE a.technologyId = ${id} and a.sortId = b.id and a.technologyId = c.id`
@@ -359,7 +359,7 @@ blog.get('/getAboutLabelData',async ctx => {
 //获取所有博客数据
 blog.get('/blogAllData', async ctx => {
     const connection = await Mysql.createConnection(mysql)
-    var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,
+    var sql = `SELECT a.id,a.title,a.introduce,a.date,a.mdname,a.pageviews,
                 a.content,a.sortId,a.technologyId,b.sort_name,
                 c.technology_name FROM blog a,blog_sort b,blog_technology c 
                 WHERE a.sortId = b.id and a.technologyId = c.id`
@@ -505,6 +505,50 @@ blog.get('/commentLeaderboard',async ctx => {
         ctx.body = {
             code:400,
             tips:'获取评论排行榜数据失败'
+        }
+    }
+})
+
+//博客浏览量排行榜
+blog.get('/topBlogViews',async ctx => {
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `SELECT id,title,date,mdname,pageviews FROM blog ORDER BY pageviews DESC LIMIT 0,10`
+    const [data] = await connection.query(sql)
+    connection.end(function (err) { }) //连接结束
+
+    if (data.length >= 0) {
+        ctx.body = {
+            data,
+            code:200,
+            tips:'获取博客排行榜数据成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取博客排行榜数据失败'
+        }
+    }
+})
+
+//增加博客浏览量
+blog.put('/addPageviews',async ctx => {
+    const id = ctx.request.body.blog_id
+    const pageviews = ctx.request.body.pageviews
+
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `UPDATE blog set pageviews=${pageviews} WHERE id=${id}`
+    const [rs] = await connection.query(sql)
+    connection.end(function (err) { }) //连接结束
+
+    if (rs.affectedRows > 0) {
+        ctx.body = {
+            code:200,
+            tips:'修改成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'修改失败'
         }
     }
 })
