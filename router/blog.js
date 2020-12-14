@@ -552,4 +552,79 @@ blog.put('/addPageviews',async ctx => {
         }
     }
 })
+
+//查询所有评论
+blog.get('/comments',async ctx => {
+    const pagenum = ctx.request.query.pagenum - 1
+    const pagesize = ctx.request.query.pagesize
+    const key = ctx.request.query.key
+
+    const connection = await Mysql.createConnection(mysql)
+
+    if (key == '' || key == null) {
+        var sql = `SELECT a.id,a.blog_id,a.user_id,a.content,a.date,a.agree_count,a.agree_user_id,b.username,c.title 
+                   FROM blog_comment a,user b,blog c WHERE a.user_id=b.id and a.blog_id=c.id
+                   LIMIT ${pagenum * pagesize},${pagesize}`
+        var [data] = await connection.query(sql)
+    } else {
+        var sql = `SELECT a.id,a.blog_id,a.user_id,a.content,a.date,a.agree_count,a.agree_user_id,b.username,c.title 
+                   FROM blog_comment a,user b,blog c WHERE a.user_id=b.id and a.blog_id=c.id and b.username like '%${key}%'`
+        var [data] = await connection.query(sql)
+    }
+
+    const sql2 = `SELECT a.respondent_id,a.reply_content,a.blog_id,b.username 
+                  FROM reply_comment a,user b WHERE a.commentator_id = b.id`
+    const [data2] = await connection.query(sql2)
+
+    const sql3 = `SELECT * FROM blog_comment`
+    const [data3] = await connection.query(sql3)
+
+    connection.end(function (err) { }) //连接结束
+
+    if (data.length >= 0) {
+        ctx.body = {
+            data,
+            data2,
+            total:data3.length,
+            code:200,
+            tips:'获取所有评论成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取所有评论失败'
+        }
+    }
+})
+
+//删除指定评论
+blog.delete('/deleteComment',async ctx => {
+    const id = Number(ctx.request.query.id)
+    const blog_id = Number(ctx.request.query.blog_id)
+    const user_id = Number(ctx.request.query.user_id)
+    const connection = await Mysql.createConnection(mysql)
+
+    const sql = `DELETE FROM blog_comment WHERE ?? = ?`
+    const [data] = await connection.query(sql, ["id", id])
+
+    const sql2 = `DELETE FROM reply_comment WHERE blog_id = ${blog_id} and respondent_id = ${user_id}`
+    const [data2] = await connection.query(sql2)
+
+    connection.end(function (err) {}) //连接结束
+
+    if (data.affectedRows > 0 && data2.affectedRows > 0) {
+        ctx.body = {
+            code:200,
+            tips:'删除评论成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'删除评论失败'
+        }
+    }
+
+})
+
+
 module.exports = blog

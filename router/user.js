@@ -100,8 +100,8 @@ user.post('/register',async ctx => {
     const avatar = ctx.request.body.avatar.trim()
 
     const connection = await Mysql.createConnection(mysql)
-    const sql = `INSERT INTO user (username,password,email,avatar,praised_count)
-                    VALUE('${username}', '${password}', '${email}', '${avatar}',0)`
+    const sql = `INSERT INTO user (username,password,email,avatar,praised,status)
+                    VALUE('${username}', '${password}', '${email}', '${avatar}',0,'false')`
     const [res] = await connection.query(sql)
     connection.end((err) => console.log(err))
 
@@ -287,6 +287,71 @@ user.get('/allCommentBlog/:id',async ctx => {
         ctx.body = {
             code:400,
             tips:'获取数据失败'
+        }
+    }
+})
+
+//查询所有用户
+user.get('/users',async ctx => {
+    const pagenum = ctx.request.query.pagenum - 1
+    const pagesize = ctx.request.query.pagesize
+    const key = ctx.request.query.key
+
+    const connection = await Mysql.createConnection(mysql)
+
+    if (key == '' || key == null) {
+        var sql = `SELECT id,username,email,praised,status FROM user LIMIT ${pagenum * pagesize},${pagesize}`
+        var [data] = await connection.query(sql)
+    } else {
+        var sql = `SELECT id,username,email,praised,status FROM user WHERE username like '%${key}%'`
+        var [data] = await connection.query(sql)
+    }
+
+    const sql2 = `SELECT * FROM user`
+    const [data2] = await connection.query(sql2)
+
+    connection.end(function (err) { }) //连接结束
+
+    if (data.length >= 0) {
+        ctx.body = {
+            data,
+            total:data2.length,
+            code:200,
+            tips:'获取所有用户成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'获取所有用户失败'
+        }
+    }
+})
+
+user.put('/users',async ctx => {
+    const id = ctx.request.body.id
+    const status = ctx.request.body.status
+    
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `UPDATE user SET status='${status}' WHERE id=${id}`
+    const [data] = await connection.query(sql)
+    connection.end(function (err) { }) //连接结束
+
+    if (data.affectedRows > 0) {
+        if(status){
+            ctx.body = {
+                code:200,
+                tips:'冻结成功'
+            }
+        }else{
+            ctx.body = {
+                code:200,
+                tips:'取消冻结'
+            }
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'冻结失败'
         }
     }
 })
