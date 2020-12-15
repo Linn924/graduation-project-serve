@@ -7,73 +7,118 @@ const mysql = require("../mysql.js")
 
 const home = new Router() //路由
 
-
 //获取壁纸数据
-home.get('/getHomePageWallpaper',async ctx => {
+home.get('/wallpapers',async ctx => {
     const connection = await Mysql.createConnection(mysql)
-    const [rs] = await connection.query(`SELECT * FROM homepage_wallpaper`)
-    connection.end(function (err) {}) //连接结束
-    const flag = rs[0].newurl.split('.').includes('mp4')
-    if (rs.length >= 0) {
+    const [res] = await connection.query(`SELECT * FROM homepage_wallpaper`)
+    connection.end((err) => console.log(err))
+    
+    const flag = res[0].newurl.split('.').includes('mp4')
+
+    if (res.length >= 0) {
         ctx.body = {
-            data:rs,
+            data:res,
             flag,
             code:200,
-            tips:'获取壁纸数据成功'
+            tips:'查询成功'
         }
     } else {
         ctx.body = {
             code:400,
-            tips:'获取壁纸数据失败'
+            tips:'查询失败'
         }
     }
 })
 
-//修改背景图片
-home.put('/putHomePageWallpaper',async ctx => {
-    const newurl = ctx.request.body.newurl
+//查询图片
+home.get('/homeImages/:name', async ctx =>{
+    const name = ctx.params.name
+    const filePath = path.join(__dirname, `../wallpaper/${name}`)
+    const file = fs.readFileSync(filePath)
+    let mimeType = mime.lookup(filePath)
+	ctx.set('content-type', mimeType)
+    ctx.body = file	
+})
 
+//查询导航
+home.get('/homeNavs',async ctx => {
     const connection = await Mysql.createConnection(mysql)
-    const sql = `UPDATE homepage_wallpaper set newurl='${newurl}' WHERE id=1`
-    const [rs] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
-
-    if (rs.affectedRows > 0) {
+    const [res] = await connection.query(`SELECT * FROM homepage_nav`)
+    connection.end((err) => console.log(err))
+   
+    if (res.length >= 0) {
         ctx.body = {
+            data:res,
             code:200,
-            tips:'更新壁纸成功'
+            tips:'查询成功'
         }
     } else {
         ctx.body = {
             code:400,
-            tips:'更新壁纸失败'
+            tips:'查询失败'
+        }
+    }
+})
+
+//分页及模糊查询自定义网站
+home.get('/websites',async ctx => {
+    const pagenum = ctx.request.query.pagenum - 1
+    const pagesize = ctx.request.query.pagesize
+    const key = ctx.request.query.key
+
+    const connection = await Mysql.createConnection(mysql)
+    if (key == '' || key == null) {
+        var sql = `SELECT * FROM homepage_nav LIMIT ${pagenum * pagesize},${pagesize}`
+        var [res] = await connection.query(sql)
+    } else {
+        var sql = `SELECT * FROM homepage_nav WHERE title like '%${key}%'`
+        var [res] = await connection.query(sql)
+    }
+
+    const sql2 = `SELECT * FROM homepage_nav`
+    const [res2] = await connection.query(sql2)
+
+    connection.end((err) => console.log(err))
+
+    if (res.length >= 0) {
+        ctx.body = {
+            data:res,
+            total:res2.length,
+            code:200,
+            tips:'查询成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'查询失败'
         }
     }
 })
 
 //上传壁纸
-home.post('/postHomePageWallpaper', async ctx =>{
+home.post('/wallpapers', async ctx =>{
     const imagePath = path.join(__dirname , "../wallpaper/")
     const image = fs.readdirSync(imagePath)
-    image.forEach(item =>  fs.unlinkSync(imagePath + item)) //清空image文件夹
+    image.forEach(item =>  fs.unlinkSync(imagePath + item)) //清空文件夹
 
     const file = ctx.request.files.image
-    const reader = fs.createReadStream(file.path) // 创建可读流
-    let name = (new Date()).getTime() + ".png"//设置文件名称
-    let filePath = path.join(__dirname , "../wallpaper/") + name//绝对路径
-    const upStream = fs.createWriteStream(filePath) // 创建可写流
-    reader.pipe(upStream) // 可读流通过管道写入可写流
+    const reader = fs.createReadStream(file.path)
+    let name = (new Date()).getTime() + ".png"
+    let filePath = path.join(__dirname , "../wallpaper/") + name
+    const upStream = fs.createWriteStream(filePath)
+    reader.pipe(upStream)
     
     const connection = await Mysql.createConnection(mysql)
-    const url = `http://127.0.0.1:8888/showImage/${name}`
+    const url = `http://127.0.0.1:8888/homeImages/${name}`
     const newurl = url
     const sql = `UPDATE homepage_wallpaper set newurl='${newurl}' , url='${url}' WHERE id=9`
-    const sql2 = `UPDATE homepage_wallpaper set newurl='${newurl}' WHERE id=1`
-    const [rs] = await connection.query(sql)
-    const [rs2] = await connection.query(sql2)
-    connection.end(function (err) {}) //连接结束
+    const [res] = await connection.query(sql)
 
-    if (rs.affectedRows > 0 && rs2.affectedRows > 0) {
+    const sql2 = `UPDATE homepage_wallpaper set newurl='${newurl}' WHERE id=1`
+    const [res2] = await connection.query(sql2)
+    connection.end((err) => console.log(err))
+
+    if (res.affectedRows > 0 && res2.affectedRows > 0) {
         ctx.body = {
             code:200,
             tips:'上传壁纸成功'
@@ -82,138 +127,6 @@ home.post('/postHomePageWallpaper', async ctx =>{
         ctx.body = {
             code:400,
             tips:'上传壁纸失败'
-        }
-    }
-})
-
-//访问服务器上的图片
-home.get('/showImage/:name', async ctx =>{
-    const name = ctx.params.name
-    const filePath = path.join(__dirname, `../wallpaper/${name}`) //默认图片地址
-    const file = fs.readFileSync(filePath) //读取文件
-    let mimeType = mime.lookup(filePath) //读取图片文件类型
-	ctx.set('content-type', mimeType) //设置返回类型
-    ctx.body = file	
-})
-
-//获取nav数据
-home.get('/getHomePageNav',async ctx => {
-    const connection = await Mysql.createConnection(mysql)
-    const [rs] = await connection.query(`SELECT * FROM homepage_nav`)
-    connection.end(function (err) {}) //连接结束
-   
-    if (rs.length >= 0) {
-        ctx.body = {
-            data:rs,
-            code:200,
-            tips:'获取数据成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'获取数据失败'
-        }
-    }
-})
-
-//修改nav数据
-home.put('/putHomePageNav',async ctx => {
-    const data = ctx.request.body
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `UPDATE homepage_nav set title='${data.title}',url='${data.url}' WHERE id=${data.id}`
-    const [rs] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
-
-    if (rs.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'更新成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'更新失败'
-        }
-    }
-})
-
-//添加nav数据
-home.post('/postHomePageNav',async ctx => {
-    const data = ctx.request.body
-    const num = Math.floor(Math.random()*8) + 1
-    const className = `#icon-app${num}`
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `INSERT INTO homepage_nav (title,className,url) VALUE
-    ('${data.title}', '${className}', '${data.url}')`
-    const [rs] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
-
-    if (rs.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'添加成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'添加失败'
-        }
-    }
-})
-
-//删除nav数据
-home.delete('/deleteHomePageNav',async ctx => {
-    const id = ctx.request.query.id
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `DELETE FROM homepage_nav WHERE ?? = ?`;
-    const [rs] = await connection.query(sql, ["id", id]);
-    connection.end(function (err) {}) //连接结束
-    
-    if (rs.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'删除成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'删除失败'
-        }
-    }
-})
-
-//分页及模糊查询自定义网站数据
-home.get('/websites',async ctx => {
-    const pagenum = ctx.request.query.pagenum - 1
-    const pagesize = ctx.request.query.pagesize
-    const key = ctx.request.query.key
-
-    const connection = await Mysql.createConnection(mysql)
-
-    if (key == '' || key == null) {
-        var sql = `SELECT * FROM homepage_nav LIMIT ${pagenum * pagesize},${pagesize}`
-        var [data] = await connection.query(sql)
-    } else {
-        var sql = `SELECT * FROM homepage_nav WHERE title like '%${key}%'`
-        var [data] = await connection.query(sql)
-    }
-
-    const sql2 = `SELECT * FROM homepage_nav`
-    const [data2] = await connection.query(sql2)
-
-    connection.end(function (err) { }) //连接结束
-
-    if (data.length >= 0) {
-        ctx.body = {
-            data,
-            total:data2.length,
-            code:200,
-            tips:'获取所有网站成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'获取所有网站失败'
         }
     }
 })
@@ -228,7 +141,7 @@ home.post('/websites',async ctx => {
     const sql = `INSERT INTO homepage_nav (title,className,url) VALUE
                  ('${name}', '${className}', '${url}')`
     const [res] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
+    connection.end((err) => console.log(err))
 
     if (res.affectedRows > 0) {
         ctx.body = {
@@ -244,7 +157,29 @@ home.post('/websites',async ctx => {
     
 })
 
-//修改自定义网站
+//修改背景图片
+home.put('/wallpapers',async ctx => {
+    const newurl = ctx.request.body.newurl
+
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `UPDATE homepage_wallpaper set newurl='${newurl}' WHERE id=1`
+    const [res] = await connection.query(sql)
+    connection.end((err) => console.log(err))
+
+    if (res.affectedRows > 0) {
+        ctx.body = {
+            code:200,
+            tips:'修改成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'修改失败'
+        }
+    }
+})
+
+//修改导航
 home.put('/websites',async ctx => {
     const id = ctx.request.body.id
     const name = ctx.request.body.name.trim()
@@ -253,7 +188,7 @@ home.put('/websites',async ctx => {
     const connection = await Mysql.createConnection(mysql)
     const sql = `UPDATE homepage_nav set title='${name}',url='${url}' WHERE id=${id}`
     const [res] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
+    connection.end((err) => console.log(err))
 
     if (res.affectedRows > 0) {
         ctx.body = {
@@ -268,14 +203,14 @@ home.put('/websites',async ctx => {
     }
 })
 
-//删除nav数据
+//删除导航
 home.delete('/websites',async ctx => {
     const id = ctx.request.query.id
 
     const connection = await Mysql.createConnection(mysql)
     const sql = `DELETE FROM homepage_nav WHERE ?? = ?`;
     const [res] = await connection.query(sql, ["id", id]);
-    connection.end(function (err) {}) //连接结束
+    connection.end((err) => console.log(err))
     
     if (res.affectedRows > 0) {
         ctx.body = {

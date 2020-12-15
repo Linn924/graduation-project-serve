@@ -49,11 +49,13 @@
     const blog = require("./router/blog.js")
     const nav = require("./router/nav.js")
     const home = require("./router/home.js")
+    const comment = require("./router/comment.js")
     
     app.use(user.routes())
     app.use(blog.routes())
     app.use(nav.routes())
     app.use(home.routes())
+    app.use(comment.routes())
     app.use(router.routes())
 
     app.listen(8888, () => {

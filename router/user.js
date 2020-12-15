@@ -10,16 +10,15 @@ const mysql = require("../mysql.js")
 const user = new Router() 
 
 //登录
-user.post('/login',async ctx => {
-    const username = ctx.request.body.username.trim()
-    const password = Md5(ctx.request.body.password.trim())
+user.get('/login',async ctx => {
+    const username = ctx.request.query.username.trim()
+    const password = Md5(ctx.request.query.password.trim())
     const userdata = {name: username,pwd: password}
     const secret = "Simon"
 
     const connection = await Mysql.createConnection(mysql)
     const sql = `SELECT * FROM user where username = '${username}' and password= '${password}'`
     const [res] = await connection.query(sql)
-
     connection.end((err) => console.log(err))
 
     if (res.length > 0) {
@@ -41,10 +40,10 @@ user.post('/login',async ctx => {
     }
 })
 
-//检查用户名是否已经被注册
-user.post('/checkUname',async ctx => {
-    const username = ctx.request.body.username.trim()
-    const status = ctx.request.body.status.trim()
+//验证用户名
+user.get('/checkName',async ctx => {
+    const username = ctx.request.query.username.trim()
+    const status = ctx.request.query.status.trim()
 
     if(username.length == 0){
         ctx.body = {
@@ -76,7 +75,7 @@ user.post('/checkUname',async ctx => {
                 }else{
                     ctx.body = {
                         code:400,
-                        tips:'未作出修改'
+                        tips:'未作出任何修改'
                     }  
                 }
                 return true
@@ -92,6 +91,73 @@ user.post('/checkUname',async ctx => {
     }
 })
 
+//验证用户身份
+user.get('/checkIdentity',async ctx => {
+    const username = ctx.request.query.username.trim()
+    const email = ctx.request.query.email.trim()
+
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `SELECT * FROM user WHERE username='${username}' and email='${email}'`
+    const [res] = await connection.query(sql)
+    connection.end((err) => console.log(err))
+
+    if(res.length === 1){
+        ctx.body = {
+            code:200,
+            tips:'身份验证成功',
+        }
+    }else{
+        ctx.body = {
+            code:400,
+            tips:'身份验证失败',
+        }
+    }
+})
+
+//查询图片
+user.get('/images/:name', async ctx =>{
+    const name = ctx.params.name
+    const filePath = path.join(__dirname, `../avatar/${name}`)
+    const file = fs.readFileSync(filePath)
+    let mimeType = mime.lookup(filePath)
+	ctx.set('content-type', mimeType)
+    ctx.body = file	
+})
+
+//查询用户(管理员)
+user.get('/usersByAdmin',async ctx => {
+    const pagenum = ctx.request.query.pagenum - 1
+    const pagesize = ctx.request.query.pagesize
+    const key = ctx.request.query.key
+
+    const connection = await Mysql.createConnection(mysql)
+    if (key == '' || key == null) {
+        var sql = `SELECT id,username,email,praised,status FROM user LIMIT ${pagenum * pagesize},${pagesize}`
+        var [res] = await connection.query(sql)
+    } else {
+        var sql = `SELECT id,username,email,praised,status FROM user WHERE username like '%${key}%'`
+        var [res] = await connection.query(sql)
+    }
+
+    const sql2 = `SELECT * FROM user`
+    const [res2] = await connection.query(sql2)
+    connection.end((err) => console.log(err))
+
+    if (res.length >= 0) {
+        ctx.body = {
+            data:res,
+            total:res2.length,
+            code:200,
+            tips:'查询成功'
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'查询失败'
+        }
+    }
+})
+
 //注册
 user.post('/register',async ctx => {
     const username = ctx.request.body.username.trim()
@@ -101,7 +167,7 @@ user.post('/register',async ctx => {
 
     const connection = await Mysql.createConnection(mysql)
     const sql = `INSERT INTO user (username,password,email,avatar,praised,status)
-                    VALUE('${username}', '${password}', '${email}', '${avatar}',0,'false')`
+                 VALUE('${username}', '${password}', '${email}', '${avatar}',0,'false')`
     const [res] = await connection.query(sql)
     connection.end((err) => console.log(err))
 
@@ -118,31 +184,100 @@ user.post('/register',async ctx => {
     }
 })
 
-//验证用户身份
-user.post('/checkUidentity',async ctx => {
-    const username = ctx.request.body.username.trim()
-    const email = ctx.request.body.email.trim()
+//上传图片
+user.post('/images', async ctx =>{
+    const file = ctx.request.files.image
+    const username = ctx.request.body.username
+    const oldAvatar = ctx.request.body.avatar.split('/').reverse()[0]
+    const oldAvatarPath = path.join(__dirname , "../avatar/") + oldAvatar
+    
+    fs.access(oldAvatarPath,async err => {
+        if(!err)
+        await fs.unlink(oldAvatarPath.trim(), (err) => { if (err) throw err }) //删除指定文件    
+    })
 
+    const reader = fs.createReadStream(file.path) 
+    let name = username + (new Date()).getTime() + ".png"
+    let filePath = path.join(__dirname , "../avatar/") + name
+    const upStream = fs.createWriteStream(filePath) 
+    reader.pipe(upStream)
+    
     const connection = await Mysql.createConnection(mysql)
-    const sql = `SELECT * FROM user WHERE username='${username}' and email='${email}'`
+    const avatar = `http://127.0.0.1:8888/images/${name}`
+    const sql = `UPDATE user SET avatar='${avatar}' WHERE username='${username}' `
     const [res] = await connection.query(sql)
     connection.end((err) => console.log(err))
 
-    if(res.length === 1){
+    if (res.affectedRows > 0) {
         ctx.body = {
+            data:avatar,
             code:200,
-            tips:'身份验证成功',
+            tips:'上传头像成功'
         }
-    }else{
+    } else {
         ctx.body = {
             code:400,
-            tips:'身份验证失败，请重新验证',
+            tips:'上传头像失败'
         }
     }
 })
 
-//重置密码
-user.put('/resetpwd',async ctx => {
+//修改用户信息(管理员)
+user.put('/usersByAdmin',async ctx => {
+    const id = ctx.request.body.id
+    const status = ctx.request.body.status
+    
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `UPDATE user SET status='${status}' WHERE id=${id}`
+    const [res] = await connection.query(sql)
+    connection.end(err => console.log(err)) 
+
+    if (res.affectedRows > 0) {
+        if(status){
+            ctx.body = {
+                code:200,
+                tips:'冻结成功'
+            }
+        }else{
+            ctx.body = {
+                code:200,
+                tips:'取消冻结'
+            }
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'冻结失败'
+        }
+    }
+})
+
+//修改用户信息(用户)
+user.put('/users',async ctx => {
+    const username = ctx.request.body.username.trim()
+    const email = ctx.request.body.email.trim()
+    const id = ctx.request.body.id
+
+    const connection = await Mysql.createConnection(mysql)
+    const sql = `UPDATE user SET username='${username}',email='${email}' WHERE id=${id}`
+    const [res] = await connection.query(sql)
+    connection.end((err) => console.log(err))
+
+    if (res.affectedRows > 0) {
+        ctx.body = {
+            code:200,
+            tips:'修改成功',
+        }
+    } else {
+        ctx.body = {
+            code:400,
+            tips:'修改失败',
+        }
+    }
+})
+
+//修改用户密码
+user.put('/password',async ctx => {
     const username = ctx.request.body.username.trim()
     const password = Md5(ctx.request.body.password.trim())
 
@@ -163,197 +298,4 @@ user.put('/resetpwd',async ctx => {
         }
     }
 })
-
-//修改用户个人信息
-user.put('/reviseUinformation',async ctx => {
-    const username = ctx.request.body.username.trim()
-    const email = ctx.request.body.email.trim()
-    const id = ctx.request.body.id
-
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `UPDATE user SET username='${username}',email='${email}' WHERE id=${id}`
-    const [res] = await connection.query(sql)
-    connection.end((err) => console.log(err))
-
-    if (res.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'信息修改成功',
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'信息修改失败',
-        }
-    }
-})
-
-//上传图片到服务器
-user.post('/uploadImg', async ctx =>{
-    const file = ctx.request.files.image
-    const username = ctx.request.body.username
-    const oldAvatar = ctx.request.body.avatar.split('/').reverse()[0]
-    const oldAvatarPath = path.join(__dirname , "../avatar/") + oldAvatar
-    
-    fs.access(oldAvatarPath,async err => {
-        if(!err)
-        await fs.unlink(oldAvatarPath.trim(), (err) => { if (err) throw err })//删除指定文件    
-    })
-
-    const reader = fs.createReadStream(file.path) // 创建可读流
-    let name = username + (new Date()).getTime() + ".png"//设置文件名称
-    let filePath = path.join(__dirname , "../avatar/") + name//绝对路径
-    const upStream = fs.createWriteStream(filePath) // 创建可写流
-    reader.pipe(upStream) // 可读流通过管道写入可写流
-    
-    const connection = await Mysql.createConnection(mysql)
-    const avatar = `http://127.0.0.1:8888/showImg/${name}`
-    const sql = `UPDATE user SET avatar='${avatar}' WHERE username='${username}' `
-    const [rs] = await connection.query(sql)
-    connection.end(function (err) {}) //连接结束
-
-    if (rs.affectedRows > 0) {
-        ctx.body = {
-            data:avatar,
-            code:200,
-            tips:'上传头像成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'上传头像失败'
-        }
-    }
-})
-
-//展示上传的图片
-user.get('/showImg/:name', async ctx =>{
-    const name = ctx.params.name
-    const filePath = path.join(__dirname, `../avatar/${name}`); //默认图片地址
-    const file = fs.readFileSync(filePath); //读取文件
-    let mimeType = mime.lookup(filePath); //读取图片文件类型
-	ctx.set('content-type', mimeType); //设置返回类型
-    ctx.body = file	
-})
-
-//用户对评论进行点赞
-user.put('/agreeComment', async ctx =>{
-    const id = ctx.request.body.id
-    const agree_count = ctx.request.body.agree_count
-    const agree_user_id = ctx.request.body.agree_user_id
-    const praised = ctx.request.body.praised
-    const linked_id = ctx.request.body.linked_id
-
-
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `UPDATE blog_comment SET agree_count=${agree_count},agree_user_id='${agree_user_id}' WHERE id=${id}`
-    const [res] = await connection.query(sql)
-
-    const sql2 = `UPDATE user SET praised=${praised} WHERE id=${linked_id}`
-    const [res2] = await connection.query(sql2)
-    connection.end((err) => console.log(err))
-
-    if (res.affectedRows > 0 && res2.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'修改成功',
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'修改失败',
-        }
-    }
-    
-})
-
-//查询所有当前用户评论过的博客信息
-user.get('/allCommentBlog/:id',async ctx => {
-    const id = ctx.params.id
-    
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `SELECT b.id,b.title,b.introduce,b.date,b.mdname
-                 FROM blog_comment a,blog b where a.user_id = ${id} and a.blog_id = b.id`
-    const [data] = await connection.query(sql)
-    connection.end(function (err) { }) //连接结束
-
-    if (data.length >= 0) {
-        ctx.body = {
-            data,
-            code:200,
-            tips:'获取数据成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'获取数据失败'
-        }
-    }
-})
-
-//查询所有用户
-user.get('/users',async ctx => {
-    const pagenum = ctx.request.query.pagenum - 1
-    const pagesize = ctx.request.query.pagesize
-    const key = ctx.request.query.key
-
-    const connection = await Mysql.createConnection(mysql)
-
-    if (key == '' || key == null) {
-        var sql = `SELECT id,username,email,praised,status FROM user LIMIT ${pagenum * pagesize},${pagesize}`
-        var [data] = await connection.query(sql)
-    } else {
-        var sql = `SELECT id,username,email,praised,status FROM user WHERE username like '%${key}%'`
-        var [data] = await connection.query(sql)
-    }
-
-    const sql2 = `SELECT * FROM user`
-    const [data2] = await connection.query(sql2)
-
-    connection.end(function (err) { }) //连接结束
-
-    if (data.length >= 0) {
-        ctx.body = {
-            data,
-            total:data2.length,
-            code:200,
-            tips:'获取所有用户成功'
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'获取所有用户失败'
-        }
-    }
-})
-
-user.put('/users',async ctx => {
-    const id = ctx.request.body.id
-    const status = ctx.request.body.status
-    
-    const connection = await Mysql.createConnection(mysql)
-    const sql = `UPDATE user SET status='${status}' WHERE id=${id}`
-    const [data] = await connection.query(sql)
-    connection.end(function (err) { }) //连接结束
-
-    if (data.affectedRows > 0) {
-        if(status){
-            ctx.body = {
-                code:200,
-                tips:'冻结成功'
-            }
-        }else{
-            ctx.body = {
-                code:200,
-                tips:'取消冻结'
-            }
-        }
-    } else {
-        ctx.body = {
-            code:400,
-            tips:'冻结失败'
-        }
-    }
-})
-
 module.exports = user
