@@ -15,20 +15,24 @@
         prefix: "/static",
         gzip: true,
     }))
-
+    
     app.use(async (ctx, next) => { //后台拦截器
-        var token = ctx.headers.authorization
-        const url = ctx.request.url
+        const token = ctx.headers.authorization
+        const method = ctx.request.method
+        const url = method !== 'DELETE' ? ctx.request.url : ctx.request.url.split('?')[0]
+        const one = method === 'GET' || url === '/password'
+        const two = method !== 'GET' && (url === '/comments' || url === '/blogs' || url === '/sorts' || url === '/labels' 
+                    || url === '/wallpapers' || url === '/websites' || url === '/navs' || url === '/images' 
+                    || url === '/usersByAdmin' || url === '/users' || url === '/replyComment' || url === '/blogsPageview')
 
-        if((url === '/addComment' || url === '/agreeComment' || url === '/replyComment') && (token == 'null')) {
+        if(one) return await next()
+        if(two && token === 'null') {
           return ctx.body = {
               code: 444,
               tips: "该功能只有登录用户可以使用",
             }
         }
-        if(url !== '/addComment' && url !== '/agreeComment' && url !== '/replyComment') return await next()
-        if((url === '/addComment' || url === '/agreeComment' || url === '/replyComment') && (token !== 'null'))
-        {   
+        if(two && token !== 'null'){   
             let flag = false
             jwt.verify(token, 'Simon', async (error, decoded) => {
                 if (!decoded) {

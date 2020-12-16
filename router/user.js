@@ -10,7 +10,7 @@ const mysql = require("../mysql.js")
 const user = new Router() 
 
 //登录
-user.get('/login',async ctx => {
+user.get('/users',async ctx => {
     const username = ctx.request.query.username.trim()
     const password = Md5(ctx.request.query.password.trim())
     const userdata = {name: username,pwd: password}
@@ -159,7 +159,7 @@ user.get('/usersByAdmin',async ctx => {
 })
 
 //注册
-user.post('/register',async ctx => {
+user.post('/users',async ctx => {
     const username = ctx.request.body.username.trim()
     const password = Md5(ctx.request.body.password.trim())
     const email = ctx.request.body.email.trim()
