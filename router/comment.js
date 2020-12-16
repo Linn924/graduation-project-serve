@@ -158,6 +158,7 @@ comment.put('/comments', async ctx =>{
     const agree_user_id = ctx.request.body.agree_user_id
     const praised = ctx.request.body.praised
     const linked_id = ctx.request.body.linked_id
+    const status = ctx.request.body.status
 
     const connection = await Mysql.createConnection(mysql)
     const sql = `UPDATE blog_comment SET agree_count=${agree_count},agree_user_id='${agree_user_id}' WHERE id=${id}`
@@ -168,14 +169,21 @@ comment.put('/comments', async ctx =>{
     connection.end((err) => console.log(err))
 
     if (res.affectedRows > 0 && res2.affectedRows > 0) {
-        ctx.body = {
-            code:200,
-            tips:'修改成功',
+        if(status){
+            ctx.body = {
+                code:200,
+                tips:'点赞成功'
+            }
+        }else{
+            ctx.body = {
+                code:200,
+                tips:'取消点赞'
+            }
         }
     } else {
         ctx.body = {
             code:400,
-            tips:'修改失败',
+            tips:'点赞失败'
         }
     }
     
