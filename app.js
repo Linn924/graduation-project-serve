@@ -9,14 +9,14 @@
     const app = new Koa()
     const router = new Router()
 
-    app.use(koaBody({ multipart: true })) //支持文件上传
-    app.use(cors()) //跨域资源共享
-    app.use(Static("./static", { //加载静态资源
+    app.use(koaBody({ multipart: true }))
+    app.use(cors())
+    app.use(Static("./static", { 
         prefix: "/static",
         gzip: true,
     }))
     
-    app.use(async (ctx, next) => { //后台拦截器
+    app.use(async (ctx, next) => { 
         const token = ctx.headers.authorization
         const method = ctx.request.method
         const url = method !== 'DELETE' ? ctx.request.url : ctx.request.url.split('?')[0]
